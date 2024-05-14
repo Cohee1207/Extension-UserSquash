@@ -1,4 +1,4 @@
-const { eventSource, event_types } = SillyTavern.getContext();
+const { eventSource, event_types, getTokenCount } = SillyTavern.getContext();
 
 const localStorageKey = 'user_squash_enabled';
 let isEnabled = localStorage.getItem(localStorageKey) === 'true';
@@ -25,7 +25,7 @@ function updateButton() {
     icon.classList.toggle('fa-comment', !isEnabled);
 }
 
-function squashChat(chat) {
+async function squashChat(chat, maxContext) {
     if (!isEnabled) {
         return;
     }
@@ -40,10 +40,25 @@ function squashChat(chat) {
 
     const { name1 } = SillyTavern.getContext();
 
-    const allChatContent = chat.map(x => x.mes).filter(x => x).join('\n\n');
+    const allChatLines = chat.map(x => x.mes).filter(x => x).join('\n\n').split('\n').reverse();
+
+    const linesToInclude = [];
+
+    for (const line of allChatLines) {
+        if (line) {
+            const text = linesToInclude.join('\n') + '\n' + line;
+            const count = getTokenCount(text);
+            if (count >= maxContext) {
+                break;
+            }
+        }
+        linesToInclude.push(line);
+    }
+
+    const messageText = linesToInclude.reverse().join('\n');
     const message = {
         name: name1,
-        mes: allChatContent,
+        mes: messageText,
         is_user: true,
         is_system: false,
         extra: {},
