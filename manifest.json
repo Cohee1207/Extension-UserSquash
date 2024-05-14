@@ -1,0 +1,14 @@
+{
+    "display_name": "User Squash",
+    "loading_order": 200,
+    "requires": [],
+    "optional": [
+        "embeddings"
+    ],
+    "generate_interceptor": "extension_userSquash",
+    "js": "index.js",
+    "css": "",
+    "author": "Cohee1207",
+    "version": "1.0.0",
+    "homePage": "https://github.com/SillyTavern/SillyTavern"
+}
