@@ -2,9 +2,7 @@
     "display_name": "User Squash",
     "loading_order": 200,
     "requires": [],
-    "optional": [
-        "embeddings"
-    ],
+    "optional": [],
     "generate_interceptor": "extension_userSquash",
     "js": "index.js",
     "css": "",
