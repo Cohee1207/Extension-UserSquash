@@ -1,3 +1,5 @@
+// import { getTokenCountAsync } from '../../../tokenizers.js';
+
 const { eventSource, event_types, getTokenCount } = SillyTavern.getContext();
 
 const localStorageKey = 'user_squash_enabled';
@@ -40,22 +42,36 @@ async function squashChat(chat, maxContext) {
 
     const { name1 } = SillyTavern.getContext();
 
-    const allChatLines = chat.map(x => x.mes).filter(x => x).join('\n\n').split('\n').reverse();
+    /*
+    // The way this decides on what is the token limit is currently broken. It does not consider character description and other extensions. Only the raw full capacity of context minus response.
+    // The easiest way would be to manually get all data card fields and extension prompts and combine it together to get a closer approximation of a biggest message that could fit your context.
+    // That would not consider prompt manager extensions however. And world info entries; because, they are calculated after the interceptor runs.
 
     const linesToInclude = [];
 
-    for (const line of allChatLines) {
+    let totalTokens = 0;
+    for (let i = chat.length - 1; i >= 0; i--) {
+        const line = chat[i].mes;
         if (line) {
-            const text = linesToInclude.join('\n') + '\n' + line;
-            const count = getTokenCount(text);
-            if (count >= maxContext) {
+            const lineTokens = await getTokenCountAsync(i === 0 ? line : '\n\n' + line);
+            if (totalTokens + lineTokens > maxContext) {
                 break;
             }
+            totalTokens += lineTokens;
+            linesToInclude.unshift(line);
         }
-        linesToInclude.push(line);
     }
 
-    const messageText = linesToInclude.reverse().join('\n');
+    const messageText = linesToInclude.join('\n\n');
+    */
+
+    let messageText = '', line;
+    for (let i = 0; i < chat.length; i++) {
+        if ((line = chat[i].mes).length === 0) continue;
+        messageText.length !== 0 && (messageText += '\n\n');
+        messageText += line;
+    }
+
     const message = {
         name: name1,
         mes: messageText,
