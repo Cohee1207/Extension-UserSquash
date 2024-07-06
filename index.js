@@ -1,7 +1,34 @@
-const { eventSource, event_types, getTokenCount } = SillyTavern.getContext();
+const { eventSource, event_types } = SillyTavern.getContext();
 
 const localStorageKey = 'user_squash_enabled';
 let isEnabled = localStorage.getItem(localStorageKey) === 'true';
+
+let lastChatSnapshot = null;
+const wordsCache = new Map();
+const nullify = () => {
+    lastChatSnapshot = null;
+    wordsCache.clear();
+};
+const getAllWords = x => {
+    if (wordsCache.has(x)) {
+        return wordsCache.get(x);
+    }
+
+    const value = x.split(/\b/).map(x => x.trim().toLowerCase().normalize().replace(/\W/g, '')).filter(x => x.length > 0);
+    wordsCache.set(x, value);
+    return value;
+}
+const isSequentialSubsetOf = (a, b) => {
+    let lastIndex = -1;
+    for (let i = 0; i < a.length; i++) {
+        const foundIndex = b.indexOf(a[i], lastIndex + 1);
+        if (foundIndex === -1) {
+            return false;
+        }
+        lastIndex = foundIndex;
+    }
+    return true;
+};
 
 const button = document.createElement('div');
 const icon = document.createElement('i');
@@ -25,49 +52,73 @@ function updateButton() {
     icon.classList.toggle('fa-comment', !isEnabled);
 }
 
-async function squashChat(chat, maxContext) {
-    if (!isEnabled) {
-        return;
+function saveChatSnapshot(chat) {
+    if (!isEnabled || !Array.isArray(chat)) {
+        return nullify();
     }
 
-    if (!Array.isArray(chat)) {
-        return;
+    lastChatSnapshot = chat.map(x => x.mes);
+}
+
+
+function areRoughlySame(a, b) {
+    // Split by word boundaries, remove non-alphanumeric characters, and normalize
+    const aWords = getAllWords(a);
+    const bWords = getAllWords(b);
+
+    return isSequentialSubsetOf(aWords, bWords) || isSequentialSubsetOf(bWords, aWords);
+}
+
+function squashChatMessages({ chat, dryRun }) {
+    if (dryRun || !isEnabled || !Array.isArray(chat) || !Array.isArray(lastChatSnapshot)) {
+        return nullify();
     }
 
-    if (chat.length === 0) {
-        return;
-    }
+    const toSquash = [];
 
-    const { name1 } = SillyTavern.getContext();
+    // Find all memoized chat messages in the prompt manager completion prompt
+    let lastProcessedIndex = 0;
 
-    const allChatLines = chat.map(x => x.mes).filter(x => x).join('\n\n').split('\n').reverse();
+    while (lastChatSnapshot.length > 0) {
+        const currentMessage = lastChatSnapshot.shift();
 
-    const linesToInclude = [];
-
-    for (const line of allChatLines) {
-        if (line) {
-            const text = linesToInclude.join('\n') + '\n' + line;
-            const count = getTokenCount(text);
-            if (count >= maxContext) {
-                break;
+        // Start iterating from the last processed index
+        for (let i = lastProcessedIndex; i < chat.length; i++) {
+            const promptMessage = chat[i];
+            if (promptMessage.role === 'system' || typeof promptMessage.content !== 'string' || !areRoughlySame(promptMessage.content, currentMessage)) {
+                continue;
             }
+            toSquash.push(promptMessage);
+            lastProcessedIndex = i + 1;
+            break;
         }
-        linesToInclude.push(line);
     }
 
-    const messageText = linesToInclude.reverse().join('\n');
-    const message = {
-        name: name1,
-        mes: messageText,
-        is_user: true,
-        is_system: false,
-        extra: {},
-        send_date: Date.now(),
+    // Not enough messages to squash
+    if (toSquash.length < 2) {
+        return nullify();
+    }
+
+    const squashedMessage = {
+        role: 'user',
+        content: toSquash.map(x => x.content).join('\n\n'),
     };
 
-    chat.splice(0, chat.length);
-    chat.push(message);
+    // Should insert after the last message to squash
+    const squashPosition = chat.indexOf(toSquash[toSquash.length - 1]) + 1;
+    chat.splice(squashPosition, 0, squashedMessage);
+
+    // Mutate the completion by removing the squashed messages
+    toSquash.forEach(x => chat.splice(chat.indexOf(x), 1));
+
+    return nullify();
 }
 
 updateButton();
-window['extension_userSquash'] = squashChat;
+window['extension_userSquash'] = saveChatSnapshot;
+
+eventSource.makeFirst(event_types.CHAT_COMPLETION_PROMPT_READY, squashChatMessages);
+eventSource.on(event_types.CHAT_CHANGED, nullify);
+eventSource.on(event_types.ONLINE_STATUS_CHANGED, nullify);
+eventSource.on(event_types.GENERATION_ENDED, nullify);
+eventSource.on(event_types.GENERATION_STOPPED, nullify);

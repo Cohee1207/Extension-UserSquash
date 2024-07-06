@@ -1,6 +1,6 @@
 {
     "display_name": "User Squash",
-    "loading_order": 200,
+    "loading_order": -1,
     "requires": [],
     "optional": [],
     "generate_interceptor": "extension_userSquash",
