@@ -13,8 +13,7 @@ const getAllWords = x => {
     if (wordsCache.has(x)) {
         return wordsCache.get(x);
     }
-
-    const value = x.split(/\b/).map(x => x.trim().toLowerCase().normalize().replace(/\W/g, '')).filter(x => x.length > 0);
+    const value = x.split(/\s/).map(x => x.trim().toLowerCase().normalize().replace(/[^\p{L}\p{N}]/gu, '')).filter(x => x.length > 0);
     wordsCache.set(x, value);
     return value;
 }
