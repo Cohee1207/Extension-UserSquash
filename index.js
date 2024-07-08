@@ -22,10 +22,13 @@ const icon = document.createElement('i');
 icon.className = 'fa-solid fa-comment';
 const text = document.createElement('span');
 text.textContent = 'Enable User Squash';
+button.tabIndex = 0;
+button.classList.add('list-group-item', 'flex-container', 'flexGap5', 'interactable');
 button.appendChild(icon);
 button.appendChild(text);
 button.addEventListener('click', () => {
     isEnabled = !isEnabled;
+    toastr.info(`User squashing is now ${isEnabled ? 'enabled' : 'disabled'}`);
     updateButton();
 });
 
