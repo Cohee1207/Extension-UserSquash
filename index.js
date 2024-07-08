@@ -7,27 +7,15 @@ let lastChatSnapshot = null;
 const wordsCache = new Map();
 const nullify = () => {
     lastChatSnapshot = null;
-    wordsCache.clear();
 };
 const getAllWords = x => {
     if (wordsCache.has(x)) {
         return wordsCache.get(x);
     }
-    const value = x.split(/\s/).map(x => x.trim().toLowerCase().normalize().replace(/[^\p{L}\p{N}]/gu, '')).filter(x => x.length > 0);
+    const value = x.split(/\s/).map(x => x.trim().toLowerCase().normalize().replace(/[^\p{L}\p{N}]/gu, '')).filter(x => x.length > 0).join(' ');
     wordsCache.set(x, value);
     return value;
 }
-const isSequentialSubsetOf = (a, b) => {
-    let lastIndex = -1;
-    for (let i = 0; i < a.length; i++) {
-        const foundIndex = b.indexOf(a[i], lastIndex + 1);
-        if (foundIndex === -1) {
-            return false;
-        }
-        lastIndex = foundIndex;
-    }
-    return true;
-};
 
 const button = document.createElement('div');
 const icon = document.createElement('i');
@@ -65,7 +53,7 @@ function areRoughlySame(a, b) {
     const aWords = getAllWords(a);
     const bWords = getAllWords(b);
 
-    return isSequentialSubsetOf(aWords, bWords) || isSequentialSubsetOf(bWords, aWords);
+    return aWords.includes(bWords) || bWords.includes(aWords);
 }
 
 function squashChatMessages({ chat, dryRun }) {
@@ -117,7 +105,7 @@ updateButton();
 window['extension_userSquash'] = saveChatSnapshot;
 
 eventSource.makeFirst(event_types.CHAT_COMPLETION_PROMPT_READY, squashChatMessages);
-eventSource.on(event_types.CHAT_CHANGED, nullify);
+eventSource.on(event_types.CHAT_CHANGED, () => { nullify(); wordsCache.clear(); });
 eventSource.on(event_types.ONLINE_STATUS_CHANGED, nullify);
 eventSource.on(event_types.GENERATION_ENDED, nullify);
 eventSource.on(event_types.GENERATION_STOPPED, nullify);
